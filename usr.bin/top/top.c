@@ -35,7 +35,6 @@
 #include <minix/type.h>
 #include <minix/endpoint.h>
 #include <minix/const.h>
-#include <minix/u64.h>
 #include <paths.h>
 #include <minix/procfs.h>
 
@@ -149,7 +148,7 @@ void parse_file(pid_t pid)
 
 	if (state != STATE_RUN)
 		p->p_flags |= BLOCKED;
-	p->p_cpucycles[0] = make64(cycles_lo, cycles_hi);
+	p->p_cpucycles[0] = cycles_lo | (u64_t) cycles_hi << 32;
 	p->p_memory = 0L;
 
 	if (!(p->p_flags & IS_TASK)) {
@@ -167,9 +166,9 @@ void parse_file(pid_t pid)
 	for(i = 1; i < CPUTIMENAMES; i++) {
 		if(fscanf(fp, " %lu %lu",
 			&cycles_hi, &cycles_lo) == 2) {
-			p->p_cpucycles[i] = make64(cycles_lo, cycles_hi);
+			p->p_cpucycles[i] = cycles_lo | (u64_t) cycles_hi << 32;
 		} else	{
-			p->p_cpucycles[i] = make64(0, 0);
+			p->p_cpucycles[i] = 0;
 		}
 	}
 
@@ -321,8 +320,10 @@ int cmp_procs(const void *v1, const void *v2)
 			return -1;
 		if(!p2blocked && p1blocked)
 			return 1;
-	} else if((c=cmp64(p1->ticks, p2->ticks)) != 0)
+	} else if(p1->ticks != p2->ticks) {
+		c = (p1->ticks > p2->ticks) ? 1 : -1;
 		return -c;
+	}
 
 	/* Process slot number is a tie breaker. */
 	return (int) (p1->p - p2->p);
@@ -341,6 +342,11 @@ struct tp *lookup(endpoint_t who, struct tp *tptab, int np)
 
 	return NULL;
 }
+
+/*
+ * Check if the below comment about div64(u64_t, u64_t) still holds as we have
+ * replaced with real division and the compiler supports it.
+ */
 
 /*
  * since we don't have true div64(u64_t, u64_t) we scale the 64 bit counters to
@@ -385,7 +391,7 @@ void print_proc(struct tp *tp, u32_t tcyc)
 	ticks = pr->p_user_time;
 	printf(" %3u:%02u ", (ticks/system_hz/60), (ticks/system_hz)%60);
 
-	pcyc = div64u(tp->ticks, SCALE);
+	pcyc = tp->ticks / SCALE;
 
 	printf("%6.2f%% %s", 100.0*pcyc/tcyc, name);
 }
@@ -412,15 +418,14 @@ char *cputimemodename(int cputimemode)
 u64_t cputicks(struct proc *p1, struct proc *p2, int timemode)
 {
 	int i;
-	u64_t t = make64(0, 0);
+	u64_t t = 0;
 	for(i = 0; i < CPUTIMENAMES; i++) {
 		if(!CPUTIME(timemode, i)) 
 			continue;
 		if(p1->p_endpoint == p2->p_endpoint) {
-			t = add64(t, sub64(p2->p_cpucycles[i],
-				p1->p_cpucycles[i]));
+			t = t + p2->p_cpucycles[i] - p1->p_cpucycles[i];
 		} else {
-			t = add64(t, p2->p_cpucycles[i]);
+			t = t + p2->p_cpucycles[i];
 		}
 	}
 
@@ -431,11 +436,11 @@ void print_procs(int maxlines,
 	struct proc *proc1, struct proc *proc2, int cputimemode)
 {
 	int p, nprocs;
-	u64_t idleticks = cvu64(0);
-	u64_t kernelticks = cvu64(0);
-	u64_t systemticks = cvu64(0);
-	u64_t userticks = cvu64(0);
-	u64_t total_ticks = cvu64(0);
+	u64_t idleticks = 0;
+	u64_t kernelticks = 0;
+	u64_t systemticks = 0;
+	u64_t userticks = 0;
+	u64_t total_ticks = 0;
 	unsigned long tcyc;
 	unsigned long tmp;
 	int blockedseen = 0;
@@ -457,7 +462,7 @@ void print_procs(int maxlines,
 		tick_procs[nprocs].p = proc2 + p;
 		tick_procs[nprocs].ticks = cputicks(&proc1[p], &proc2[p], cputimemode);
 		uticks = cputicks(&proc1[p], &proc2[p], 1);
-		total_ticks = add64(total_ticks, uticks);
+		total_ticks = total_ticks + uticks;
 		if(p-NR_TASKS == IDLE) {
 			idleticks = uticks;
 			continue;
@@ -467,33 +472,31 @@ void print_procs(int maxlines,
 		}
 		if(!(proc2[p].p_flags & IS_TASK)) {
 			if(proc2[p].p_flags & IS_SYSTEM)
-				systemticks = add64(systemticks,
-					tick_procs[nprocs].ticks);
+				systemticks = systemticks + tick_procs[nprocs].ticks;
 			else
-				userticks = add64(userticks,
-					tick_procs[nprocs].ticks);
+				userticks = userticks +	tick_procs[nprocs].ticks;
 		}
 
 		nprocs++;
 	}
 
-	if (!cmp64u(total_ticks, 0))
+	if (total_ticks == 0)
 		return;
 
 	qsort(tick_procs, nprocs, sizeof(tick_procs[0]), cmp_procs);
 
-	tcyc = div64u(total_ticks, SCALE);
+	tcyc = total_ticks / SCALE;
 
-	tmp = div64u(userticks, SCALE);
+	tmp = userticks / SCALE;
 	printf("CPU states: %6.2f%% user, ", 100.0*(tmp)/tcyc);
 
-	tmp = div64u(systemticks, SCALE);
+	tmp = systemticks / SCALE;
 	printf("%6.2f%% system, ", 100.0*tmp/tcyc);
 
-	tmp = div64u(kernelticks, SCALE);
+	tmp = kernelticks / SCALE;
 	printf("%6.2f%% kernel, ", 100.0*tmp/tcyc);
 
-	tmp = div64u(idleticks, SCALE);
+	tmp = idleticks / SCALE;
 	printf("%6.2f%% idle", 100.0*tmp/tcyc);
 
 #define NEWLINE do { printf("\n"); if(--maxlines <= 0) { return; } } while(0) 
