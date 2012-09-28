@@ -321,8 +321,7 @@ int cmp_procs(const void *v1, const void *v2)
 		if(!p2blocked && p1blocked)
 			return 1;
 	} else if(p1->ticks != p2->ticks) {
-		c = (p1->ticks > p2->ticks) ? 1 : -1;
-		return -c;
+		return (p2->ticks - p1->ticks);
 	}
 
 	/* Process slot number is a tie breaker. */
@@ -343,29 +342,14 @@ struct tp *lookup(endpoint_t who, struct tp *tptab, int np)
 	return NULL;
 }
 
-/*
- * Check if the below comment about div64(u64_t, u64_t) still holds as we have
- * replaced with real division and the compiler supports it.
- */
-
-/*
- * since we don't have true div64(u64_t, u64_t) we scale the 64 bit counters to
- * 32. Since the samplig happens every ~1s and the counters count CPU cycles
- * during this period, unless we have extremely fast CPU, shifting the counters
- * by 12 make them 32bit counters which we can use for normal integer
- * arithmetics
- */
-#define SCALE	(1 << 12)
-
 double ktotal = 0;
 
-void print_proc(struct tp *tp, u32_t tcyc)
+void print_proc(struct tp *tp, u64_t total_ticks)
 {
 	int euid = 0;
 	static struct passwd *who = NULL;
 	static int last_who = -1;
 	char *name = "";
-	unsigned long pcyc;
 	int ticks;
 	struct proc *pr = tp->p;
 
@@ -391,9 +375,7 @@ void print_proc(struct tp *tp, u32_t tcyc)
 	ticks = pr->p_user_time;
 	printf(" %3u:%02u ", (ticks/system_hz/60), (ticks/system_hz)%60);
 
-	pcyc = tp->ticks / SCALE;
-
-	printf("%6.2f%% %s", 100.0*pcyc/tcyc, name);
+	printf("%6.2f%% %s", 100.0 * tp->ticks / total_ticks, name);
 }
 
 char *cputimemodename(int cputimemode)
@@ -474,7 +456,7 @@ void print_procs(int maxlines,
 			if(proc2[p].p_flags & IS_SYSTEM)
 				systemticks = systemticks + tick_procs[nprocs].ticks;
 			else
-				userticks = userticks +	tick_procs[nprocs].ticks;
+				userticks = userticks + tick_procs[nprocs].ticks;
 		}
 
 		nprocs++;
@@ -485,19 +467,10 @@ void print_procs(int maxlines,
 
 	qsort(tick_procs, nprocs, sizeof(tick_procs[0]), cmp_procs);
 
-	tcyc = total_ticks / SCALE;
-
-	tmp = userticks / SCALE;
-	printf("CPU states: %6.2f%% user, ", 100.0*(tmp)/tcyc);
-
-	tmp = systemticks / SCALE;
-	printf("%6.2f%% system, ", 100.0*tmp/tcyc);
-
-	tmp = kernelticks / SCALE;
-	printf("%6.2f%% kernel, ", 100.0*tmp/tcyc);
-
-	tmp = idleticks / SCALE;
-	printf("%6.2f%% idle", 100.0*tmp/tcyc);
+	printf("CPU states: %6.2f%% user, ", 100.0 * userticks / total_ticks);
+	printf("%6.2f%% system, ", 100.0 * systemticks / total_ticks);
+	printf("%6.2f%% kernel, ", 100.0 * kernelticks/ total_ticks);
+	printf("%6.2f%% idle", 100.0 * idleticks / total_ticks);
 
 #define NEWLINE do { printf("\n"); if(--maxlines <= 0) { return; } } while(0) 
 	NEWLINE;
@@ -531,7 +504,7 @@ void print_procs(int maxlines,
 			blockedseen = 1;
 		}
 
-		print_proc(&tick_procs[p], tcyc);
+		print_proc(&tick_procs[p], total_ticks);
 		NEWLINE;
 
 		if(!blockedverbose)
@@ -555,7 +528,7 @@ void print_procs(int maxlines,
 			tpdep = lookup(dep, tick_procs, nprocs);
 			pr = tpdep->p;
 			printf("%*s> ", level, "");
-			print_proc(tpdep, tcyc);
+			print_proc(tpdep, total_ticks);
 			NEWLINE;
 		}
 	}
