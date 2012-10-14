@@ -35,6 +35,7 @@
 #include <minix/type.h>
 #include <minix/endpoint.h>
 #include <minix/const.h>
+#include <minix/u64.h>
 #include <paths.h>
 #include <minix/procfs.h>
 
@@ -148,7 +149,7 @@ void parse_file(pid_t pid)
 
 	if (state != STATE_RUN)
 		p->p_flags |= BLOCKED;
-	p->p_cpucycles[0] = cycles_lo | (u64_t) cycles_hi << 32;
+	p->p_cpucycles[0] = make64(cycles_lo, cycles_hi);
 	p->p_memory = 0L;
 
 	if (!(p->p_flags & IS_TASK)) {
@@ -166,7 +167,7 @@ void parse_file(pid_t pid)
 	for(i = 1; i < CPUTIMENAMES; i++) {
 		if(fscanf(fp, " %lu %lu",
 			&cycles_hi, &cycles_lo) == 2) {
-			p->p_cpucycles[i] = cycles_lo | (u64_t) cycles_hi << 32;
+			p->p_cpucycles[i] = make64(cycles_lo, cycles_hi);
 		} else	{
 			p->p_cpucycles[i] = 0;
 		}
@@ -232,10 +233,10 @@ void get_procs(void)
 int print_memory(void)
 {
 	FILE *fp;
-	unsigned int pagesize; 
+	unsigned int pagesize;
 	unsigned long total, free, largest, cached;
 
-	if ((fp = fopen("meminfo", "r")) == NULL)	
+	if ((fp = fopen("meminfo", "r")) == NULL)
 		return 0;
 
 	if (fscanf(fp, "%u %lu %lu %lu %lu", &pagesize, &total, &free,
@@ -307,7 +308,7 @@ int cmp_procs(const void *v1, const void *v2)
 	p2blocked = !!(p2->p->p_flags & BLOCKED);
 
 	/* Primarily order by used number of cpu cycles.
-	 * 
+	 *
 	 * Exception: if in blockedverbose mode, a blocked
 	 * process is always printed after an unblocked
 	 * process, and used cpu cycles don't matter.
@@ -384,7 +385,7 @@ char *cputimemodename(int cputimemode)
 	int i;
 
 	name[0] = '\0';
-	
+
 	for(i = 0; i < CPUTIMENAMES; i++) {
 		if(CPUTIME(cputimemode, i)) {
 			assert(strlen(name) +
@@ -402,7 +403,7 @@ u64_t cputicks(struct proc *p1, struct proc *p2, int timemode)
 	int i;
 	u64_t t = 0;
 	for(i = 0; i < CPUTIMENAMES; i++) {
-		if(!CPUTIME(timemode, i)) 
+		if(!CPUTIME(timemode, i))
 			continue;
 		if(p1->p_endpoint == p2->p_endpoint) {
 			t = t + p2->p_cpucycles[i] - p1->p_cpucycles[i];
@@ -472,7 +473,7 @@ void print_procs(int maxlines,
 	printf("%6.2f%% kernel, ", 100.0 * kernelticks/ total_ticks);
 	printf("%6.2f%% idle", 100.0 * idleticks / total_ticks);
 
-#define NEWLINE do { printf("\n"); if(--maxlines <= 0) { return; } } while(0) 
+#define NEWLINE do { printf("\n"); if(--maxlines <= 0) { return; } } while(0)
 	NEWLINE;
 
 	printf("CPU time displayed (press '%c' to cycle): %s",
@@ -651,7 +652,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if(s < 1) 
+	if(s < 1)
 		s = 2;
 
 	/* Catch window size changes so display is updated properly
