@@ -532,8 +532,8 @@ void geometry(void)
 		if (ioctl(device, DIOCGETP, &geometry) < 0)
 			err= errno;
 		else {
-			table[0].lowsec= div64u(geometry.base, SECTOR_SIZE);
-			table[0].size= div64u(geometry.size, SECTOR_SIZE);
+			table[0].lowsec= geometry.base / SECTOR_SIZE;
+			table[0].size= geometry.size / SECTOR_SIZE;
 			cylinders= geometry.cylinders;
 			heads= geometry.heads;
 			sectors= geometry.sectors;
@@ -585,8 +585,8 @@ exit(1);
 	 * This makes sense for subpartitioning primary partitions.
 	 */
 	if (precise && ioctl(device, DIOCGETP, &geometry) >= 0) {
-		table[0].lowsec= div64u(geometry.base, SECTOR_SIZE);
-		table[0].size= div64u(geometry.size, SECTOR_SIZE);
+		table[0].lowsec= geometry.base / SECTOR_SIZE;
+		table[0].size= geometry.size / SECTOR_SIZE;
 	} else {
 		precise= 0;
 	}
@@ -1401,7 +1401,7 @@ void installboot(unsigned char *bootblock, char *masterboot)
 ssize_t boot_readwrite(int rw)
 /* Read (0) or write (1) the boot sector. */
 {
-	u64_t off64 = mul64u(offset, SECTOR_SIZE);
+	u64_t off64 = offset * SECTOR_SIZE;
 	int r = 0;
 
 #if __minix_vmd
@@ -1414,9 +1414,9 @@ ssize_t boot_readwrite(int rw)
 	if (offset >= (LONG_MAX / SECTOR_SIZE - 1)) {
 		/* Move partition base. */
 		if (ioctl(device, DIOCGETP, &geom0) < 0) return -1;
-		geom_seek.base = add64(geom0.base, off64);
-		geom_seek.size = cvu64(cmp64(add64u(off64, SECTOR_SIZE),
-			geom0.size) <= 0 ? _STATIC_BLOCK_SIZE : 0);
+		geom_seek.base = geom0.base + off64;
+		geom_seek.size = cvu64(((off64 + SECTOR_SIZE)
+			<= geom0.size) ? _STATIC_BLOCK_SIZE : 0);
 		sync();
 		if (ioctl(device, DIOCSETP, &geom_seek) < 0) return -1;
 		if (lseek(device, (off_t) 0, SEEK_SET) == -1) return -1;
@@ -2184,8 +2184,8 @@ sanitycheck_failed(char *dev, struct part_entry *pe)
 
 	close(fd);
 
-	it_lowsec = div64u(part.base, SECTOR_SIZE);
-	it_secsize = div64u(part.size, SECTOR_SIZE);
+	it_lowsec = part.base / SECTOR_SIZE;
+	it_secsize = part.size / SECTOR_SIZE;
 
 	if(it_lowsec != pe->lowsec || it_secsize != pe->size) {
 		fprintf(stderr, "\nReturned and set numbers don't match up!\n");

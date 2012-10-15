@@ -40,6 +40,7 @@
 #include <minix/procfs.h>
 
 #define TIMECYCLEKEY 't'
+#define ORDERKEY 'o'
 
 #define ORDER_CPU	0
 #define ORDER_MEMORY	1
@@ -294,7 +295,6 @@ struct tp {
 
 int cmp_procs(const void *v1, const void *v2)
 {
-	int c;
 	struct tp *p1 = (struct tp *) v1, *p2 = (struct tp *) v2;
 	int p1blocked, p2blocked;
 
@@ -415,6 +415,15 @@ u64_t cputicks(struct proc *p1, struct proc *p2, int timemode)
 	return t;
 }
 
+char *ordername(int orderno)
+{
+	switch(orderno) {
+		case ORDER_CPU: return "cpu";
+		case ORDER_MEMORY: return "memory";
+	}
+	return "invalid order";
+}
+
 void print_procs(int maxlines,
 	struct proc *proc1, struct proc *proc2, int cputimemode)
 {
@@ -424,8 +433,11 @@ void print_procs(int maxlines,
 	u64_t systemticks = 0;
 	u64_t userticks = 0;
 	u64_t total_ticks = 0;
+<<<<<<< HEAD
 	unsigned long tcyc;
 	unsigned long tmp;
+=======
+>>>>>>> master
 	int blockedseen = 0;
 	static struct tp *tick_procs = NULL;
 
@@ -476,8 +488,9 @@ void print_procs(int maxlines,
 #define NEWLINE do { printf("\n"); if(--maxlines <= 0) { return; } } while(0)
 	NEWLINE;
 
-	printf("CPU time displayed (press '%c' to cycle): %s",
+	printf("CPU time displayed ('%c' to cycle): %s; ",
 		TIMECYCLEKEY, cputimemodename(cputimemode));
+	printf(" sort order ('%c' to cycle): %s", ORDERKEY, ordername(order));
 	NEWLINE;
 
 	NEWLINE;

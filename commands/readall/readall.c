@@ -83,7 +83,7 @@ char *argv[];
 {
   struct partition entry;
   int fd, s, i, badprinted;
-  long b = 0, nblocks;
+  u64_t b = 0, nblocks;
   char *p;
   time_t starttime;
 
@@ -161,7 +161,7 @@ char *argv[];
 			output(b);
 			fprintf(stderr, "\n");
 		} else fprintf(stderr, "\r%*s\n", -WIDTH, "Done scanning.");
-		if (total) printf("%8ld\n", b);
+		if (total) printf("%8lld\n", b);
 		if ((errors == 0) || total) exit(0);
 		badprinted = 0;
 		if (normal) printf("Summary of bad blocks\n");
