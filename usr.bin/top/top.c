@@ -433,11 +433,6 @@ void print_procs(int maxlines,
 	u64_t systemticks = 0;
 	u64_t userticks = 0;
 	u64_t total_ticks = 0;
-<<<<<<< HEAD
-	unsigned long tcyc;
-	unsigned long tmp;
-=======
->>>>>>> master
 	int blockedseen = 0;
 	static struct tp *tick_procs = NULL;
 
