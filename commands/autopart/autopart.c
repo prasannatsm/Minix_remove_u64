@@ -150,9 +150,9 @@ void tty_raw(void)
 char t_cd[16], t_cm[32], t_so[16], t_se[16], t_md[16], t_me[16];
 #define STATUSROW	10
 
-void putchr(int c)
+int putchr(int c)
 {
-	putchar(c);
+	return putchar(c);
 }
 
 void putstr(char *s)
@@ -359,7 +359,7 @@ struct part_entry table[1 + NR_PARTITIONS];
 int existing[1 + NR_PARTITIONS];
 unsigned long offset= 0, extbase= 0, extsize;
 int submerged= 0;
-char sort_index[1 + NR_PARTITIONS], sort_order[1 + NR_PARTITIONS];
+int sort_index[1 + NR_PARTITIONS], sort_order[1 + NR_PARTITIONS];
 unsigned cylinders= 1, heads= 1, sectors= 1, secpcyl= 1;
 unsigned alt_cyls= 1, alt_heads= 1, alt_secs= 1;
 int precise= 0;
@@ -532,8 +532,8 @@ void geometry(void)
 		if (ioctl(device, DIOCGETP, &geometry) < 0)
 			err= errno;
 		else {
-			table[0].lowsec= geometry.base / SECTOR_SIZE;
-			table[0].size= geometry.size / SECTOR_SIZE;
+			table[0].lowsec= div64u(geometry.base, SECTOR_SIZE);
+			table[0].size= div64u(geometry.size, SECTOR_SIZE);
 			cylinders= geometry.cylinders;
 			heads= geometry.heads;
 			sectors= geometry.sectors;
@@ -585,8 +585,8 @@ exit(1);
 	 * This makes sense for subpartitioning primary partitions.
 	 */
 	if (precise && ioctl(device, DIOCGETP, &geometry) >= 0) {
-		table[0].lowsec= geometry.base / SECTOR_SIZE;
-		table[0].size= geometry.size / SECTOR_SIZE;
+		table[0].lowsec= div64u(geometry.base, SECTOR_SIZE);
+		table[0].size= div64u(geometry.size, SECTOR_SIZE);
 	} else {
 		precise= 0;
 	}
@@ -1401,44 +1401,16 @@ void installboot(unsigned char *bootblock, char *masterboot)
 ssize_t boot_readwrite(int rw)
 /* Read (0) or write (1) the boot sector. */
 {
-	u64_t off64 = offset * SECTOR_SIZE;
 	int r = 0;
 
-#if __minix_vmd
-	/* Minix-vmd has a 64 bit seek. */
-	if (fcntl(device, F_SEEK, off64) < 0) return -1;
-#else
-	/* Minix has to gross things with the partition base. */
-	struct partition geom0, geom_seek;
-
-	if (offset >= (LONG_MAX / SECTOR_SIZE - 1)) {
-		/* Move partition base. */
-		if (ioctl(device, DIOCGETP, &geom0) < 0) return -1;
-		geom_seek.base = geom0.base + off64;
-		geom_seek.size = cvu64(((off64 + SECTOR_SIZE)
-			<= geom0.size) ? _STATIC_BLOCK_SIZE : 0);
-		sync();
-		if (ioctl(device, DIOCSETP, &geom_seek) < 0) return -1;
-		if (lseek(device, (off_t) 0, SEEK_SET) == -1) return -1;
-	} else {
-		/* Can reach this point normally. */
-		if (lseek(device, (off_t) offset * SECTOR_SIZE, SEEK_SET) == -1)
-			return -1;
-	}
-#endif
+	if (lseek64(device, (u64_t) offset * SECTOR_SIZE, SEEK_SET, NULL) < 0)
+		return -1;
 
 	switch (rw) {
 	case 0:	r= read(device, bootblock, SECTOR_SIZE);	break;
 	case 1:	r= write(device, bootblock, SECTOR_SIZE);	break;
 	}
 
-#if !__minix_vmd
-	if (offset >= (LONG_MAX / SECTOR_SIZE - 1)) {
-		/* Restore partition base and size. */
-		sync();
-		if (ioctl(device, DIOCSETP, &geom0) < 0) return -1;
-	}
-#endif
 	return r;
 }
 
