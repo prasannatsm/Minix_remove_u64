@@ -15,7 +15,6 @@
 #include <string.h>
 #include <assert.h>
 #include <minix/com.h>
-#include <minix/u64.h>
 #include <minix/bdev.h>
 #include "buf.h"
 #include "inode.h"
@@ -206,10 +205,10 @@ static int rw_super(struct super_block *sp, int writing)
   if(writing) {
   	memset(sbbuf, 0, _MIN_BLOCK_SIZE);
   	memcpy(sbbuf, sp, ondisk_bytes);
-  	r = bdev_write(sp->s_dev, cvu64(SUPER_BLOCK_BYTES), sbbuf, _MIN_BLOCK_SIZE,
+  	r = bdev_write(sp->s_dev, SUPER_BLOCK_BYTES, sbbuf, _MIN_BLOCK_SIZE,
 		BDEV_NOFLAGS);
   } else {
-  	r = bdev_read(sp->s_dev, cvu64(SUPER_BLOCK_BYTES), sbbuf, _MIN_BLOCK_SIZE,
+  	r = bdev_read(sp->s_dev, SUPER_BLOCK_BYTES, sbbuf, _MIN_BLOCK_SIZE,
 		BDEV_NOFLAGS);
 	memset(sp, 0, sizeof(*sp));
   	memcpy(sp, sbbuf, ondisk_bytes);
@@ -308,22 +307,22 @@ int read_super(struct super_block *sp)
 	sp->s_firstdatazone = (zone_t) sp->s_firstdatazone_old;
   }
 
-  if (sp->s_block_size < _MIN_BLOCK_SIZE) 
+  if (sp->s_block_size < _MIN_BLOCK_SIZE)
   	return(EINVAL);
-  
-  if ((sp->s_block_size % 512) != 0) 
+
+  if ((sp->s_block_size % 512) != 0)
   	return(EINVAL);
-  
-  if (SUPER_SIZE > sp->s_block_size) 
+
+  if (SUPER_SIZE > sp->s_block_size)
   	return(EINVAL);
-  
+
   if ((sp->s_block_size % V2_INODE_SIZE) != 0 ||
      (sp->s_block_size % V1_INODE_SIZE) != 0) {
   	return(EINVAL);
   }
 
   /* Limit s_max_size to LONG_MAX */
-  if ((unsigned long)sp->s_max_size > LONG_MAX) 
+  if ((unsigned long)sp->s_max_size > LONG_MAX)
 	sp->s_max_size = LONG_MAX;
 
   sp->s_isearch = 0;		/* inode searches initially start at 0 */

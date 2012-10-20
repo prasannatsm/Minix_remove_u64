@@ -2,7 +2,6 @@
 #include <string.h>
 #include <minix/com.h>
 #include <assert.h>
-#include <minix/u64.h>
 #include "buf.h"
 #include "inode.h"
 #include "super.h"
@@ -73,7 +72,7 @@ int map;			/* IMAP (inode map) or ZMAP (zone map) */
         /* Don't count bits beyond the end of the map. */
         if (b >= map_bits) {
           break;
-        } 
+        }
         if ((k & (1 << i)) == 0) {
           free_bits++;
         }

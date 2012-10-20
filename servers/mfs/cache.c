@@ -31,7 +31,7 @@ static void read_block(struct buf *);
 
 static int vmcache = 0; /* are we using vm's secondary cache? (initially not) */
 
-static block_t super_start = 0, super_end = 0; 
+static block_t super_start = 0, super_end = 0;
 
 /*===========================================================================*
  *				get_block				     *
@@ -67,7 +67,7 @@ struct buf *get_block(
 
   ASSERT(fs_block_size > 0);
 
-  /* Search the hash chain for (dev, block). Do_read() can use 
+  /* Search the hash chain for (dev, block). Do_read() can use
    * get_block(NO_DEV ...) to get an unnamed block to fill with zeros when
    * someone wants to read from a hole in a file, in which case this search
    * is skipped
@@ -159,7 +159,7 @@ struct buf *get_block(
   buf_hash[b] = bp;		/* add to hash list */
 
   if(dev == NO_DEV) {
-	if(vmcache && cmp64(yieldid, VM_BLOCKID_NONE) != 0) {
+	if(vmcache && (yieldid != VM_BLOCKID_NONE)) {
 		vm_yield_block_get_block(yieldid, VM_BLOCKID_NONE,
 			bp->bp, fs_block_size);
 	}
@@ -172,7 +172,7 @@ struct buf *get_block(
 	 * if it's in the vm cache.
 	 */
 	if(vmcache) {
-		/* If we can satisfy the PREFETCH or NORMAL request 
+		/* If we can satisfy the PREFETCH or NORMAL request
 		 * from the vm cache, work is done.
 		 */
 		if(vm_yield_block_get_block(yieldid, getid,
@@ -241,7 +241,7 @@ int block_type;			/* INODE_BLOCK, DIRECTORY_BLOCK, or whatever */
 	else
 		front->b_prev = bp;
 	front = bp;
-  } 
+  }
   else {
 	/* Block probably will be needed quickly.  Put it on rear of chain.
   	 * It will not be evicted from the cache for a long time.
@@ -338,7 +338,7 @@ register struct buf *bp;	/* buffer pointer */
   op_failed = 0;
 
   if ( (dev = bp->b_dev) != NO_DEV) {
-	pos = mul64u(bp->b_blocknr, fs_block_size);
+	pos = bp->b_blocknr * fs_block_size;
 	r = bdev_read(dev, pos, bp->b_data, fs_block_size,
 		BDEV_NOFLAGS);
 	if (r < 0) {
@@ -484,7 +484,7 @@ void rw_scattered(
 		iop->iov_addr = (vir_bytes) bp->b_data;
 		iop->iov_size = (vir_bytes) fs_block_size;
 	}
-	pos = mul64u(bufq[0]->b_blocknr, fs_block_size);
+	pos = bufq[0]->b_blocknr * fs_block_size;
 	if (rw_flag == READING)
 		r = bdev_gather(dev, pos, iovec, j, BDEV_NOFLAGS);
 	else
@@ -608,7 +608,7 @@ void set_blocksize(struct super_block *sp)
   cache_resize(sp->s_block_size, MINBUFS);
   bufs = bufs_heuristic(sp);
   cache_resize(sp->s_block_size, bufs);
-  
+
   /* Decide whether to use seconday cache or not.
    * Only do this if
    *	- it's available, and
