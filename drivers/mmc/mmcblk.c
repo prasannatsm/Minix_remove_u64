@@ -96,17 +96,29 @@ static struct blockdriver mmc_driver = {
 static int
 apply_env()
 {
-#if 0
-	/* @TODO: re-enable this function when __aeabi_idiv will be present
-	 * The following code(env_parse) uses strtol.c and needs __aeabi_idiv */
 	/* apply the env setting passed to this driver parameters accepted
 	 * log_level=[0-4] (NONE,WARNING,INFO,DEBUG,TRACE) instance=[0-3]
 	 * instance/bus number to use for this driver Passing these arguments
 	 * is done when starting the driver using the service command in the
-	 * following way service up /sbin/mmcblk -args "log_level=2
-	 * instance=1" */
+	 * following way service up /sbin/mmc -args "log_level=2 instance=1 
+	 * driver=dummy" -dev /dev/c2d0 */
+	char driver[16];
+	memset(driver, '\0', 16);
+	(void) env_get_param("driver", driver, 16);
+	if (strlen(driver) == 0
+	    || strncmp(driver, "mmchs", strlen("mmchs") + 1) == 0) {
+		/* early init of host mmc host controller. This code should
+		 * depend on knowing the hardware that is running bellow. */
+		host_initialize_host_structure_mmchs(&host);
+	} else if (strncmp(driver, "dummy", strlen("dummy") + 1) == 0) {
+		host_initialize_host_structure_dummy(&host);
+	} else {
+		mmc_log_warn(&log, "Unknown driver %s\n", driver);
+	}
+#if 0
 	long v;
-
+	/* The following code(env_parse) uses strtol.c and needs __aeabi_idiv */
+	/* @TODO: re-enable this function when __aeabi_idiv will be present */
 	/* Initialize the verbosity level. */
 	v = 0;
 	if (env_parse("log_level", "d", 0, &v, LEVEL_NONE,
@@ -184,13 +196,13 @@ block_open(dev_t minor, int access)
 		mmc_log_debug(&log, "part %d\t0x%016llx 0x%016llx\n", i,
 		    slot->card.part[i].dv_base, slot->card.part[i].dv_size);
 		for (j = 0; j < 4; j++) {
-			if (slot->card.part[i * 4 + j].dv_size == 0)
+			if (slot->card.subpart[(i - 1) * 4 + j].dv_size == 0)
 				continue;
 			sub_part_count++;
 			mmc_log_debug(&log,
 			    " sub %d/%d\t0x%016llx 0x%016llx\n", i, j,
-			    slot->card.part[i * 4 + j].dv_base,
-			    slot->card.part[i * 4 + j].dv_size);
+			    slot->card.subpart[(i - 1) * 4 + j].dv_base,
+			    slot->card.subpart[(i - 1) * 4 + j].dv_size);
 		}
 	}
 	mmc_log_info(&log, "Found %d partitions and %d sub partitions\n",
@@ -503,7 +515,7 @@ block_part(dev_t minor)
 		mmc_log_trace(&log,
 		    "returning partition(%d) (base,size)=(0x%016llx,0x%016llx)\n",
 		    minor, dev->dv_base, dev->dv_size);
-	} else if (minor >= 128 && minor <= 128 + 16) {
+	} else if (minor >= 128 && minor < 128 + 16) {
 		/* sub partitions of the first disk we don't care about the
 		 * rest */
 		dev = &slot->card.subpart[minor - 128];
@@ -642,9 +654,6 @@ set_log_level(int level)
 int
 main(int argc, char **argv)
 {
-	/* early init of host mmc host controller. This code should depend on
-	 * knowing the hardware that is running bellow. */
-	host_initialize_host_structure(&host);
 
 	/* Set and apply the environment */
 	env_setargs(argc, argv);
