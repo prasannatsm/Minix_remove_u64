@@ -57,13 +57,8 @@ int fs_readwrite(void)
   gid = (cp_grant_id_t) fs_m_in.REQ_GRANT;
   position = (off_t) fs_m_in.REQ_SEEK_POS_LO;
   nrbytes = (size_t) fs_m_in.REQ_NBYTES;
-<<<<<<< .merge_file_9UqFgR
 
-  rdwt_err = OK;		/* set to EIO if disk error occurs */
-=======
-  
   lmfs_reset_rdwt_err();
->>>>>>> .merge_file_t2fkkQ
 
   /* If this is file i/o, check we can write */
   if (rw_flag == WRITING && !block_spec) {
@@ -177,13 +172,8 @@ int fs_breadwrite(void)
   rip.i_mode = I_BLOCK_SPECIAL;
   rip.i_size = 0;
 
-<<<<<<< .merge_file_9UqFgR
-  rdwt_err = OK;		/* set to EIO if disk error occurs */
-
-=======
   lmfs_reset_rdwt_err();
-  
->>>>>>> .merge_file_t2fkkQ
+
   cum_io = 0;
   /* Split the transfer into chunks that don't span two blocks. */
   while (nrbytes > 0) {
@@ -202,21 +192,12 @@ int fs_breadwrite(void)
 	  cum_io += chunk;	        /* bytes read so far */
 	  position = position + chunk;	/* position within the file */
   }
-<<<<<<< .merge_file_9UqFgR
 
   fs_m_out.RES_SEEK_POS_LO = ex64lo(position);
   fs_m_out.RES_SEEK_POS_HI = ex64hi(position);
 
-  if (rdwt_err != OK) r = rdwt_err;	/* check for disk error */
-  if (rdwt_err == END_OF_FILE) r = OK;
-=======
-  
-  fs_m_out.RES_SEEK_POS_LO = ex64lo(position); 
-  fs_m_out.RES_SEEK_POS_HI = ex64hi(position); 
-  
   if (lmfs_rdwt_err() != OK) r = lmfs_rdwt_err();	/* check for disk error */
   if (lmfs_rdwt_err() == END_OF_FILE) r = OK;
->>>>>>> .merge_file_t2fkkQ
 
   fs_m_out.RES_NBYTES = cum_io;
 
@@ -612,15 +593,9 @@ int fs_getdents(void)
 	  if (block_pos < pos)
 		  dp = &b_dir(bp)[off / DIR_ENTRY_SIZE];
 	  else
-<<<<<<< .merge_file_9UqFgR
-		  dp = &bp->b_dir[0];
-	  for (; dp < &bp->b_dir[NR_DIR_ENTRIES(block_size)]; dp++) {
-		  if (dp->mfs_d_ino == 0)
-=======
 		  dp = &b_dir(bp)[0];
 	  for (; dp < &b_dir(bp)[NR_DIR_ENTRIES(block_size)]; dp++) {
-		  if (dp->mfs_d_ino == 0) 
->>>>>>> .merge_file_t2fkkQ
+		  if (dp->mfs_d_ino == 0)
 			  continue;	/* Entry is not in use */
 
 		  /* Compute the length of the name */
